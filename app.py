@@ -3,13 +3,17 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://site.db'
+# Render의 DATABASE_URL 사용, 로컬은 SQLite
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
+# PostgreSQL 연결 시 필요한 URL 포맷 조정
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = '1234'
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'your-jwt-secret-key')  # 환경 변수로 관리
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
 app.config['JSON_AS_ASCII'] = False
 
@@ -27,13 +31,18 @@ class User(db.Model):
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
-    content = db.Column(db.text, nullable=False)
+    content = db.Column(db.Text, nullable=False)
     author = db.Column(db.String(20), nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime, onupdate=lambda:datetime.now(timezone.utc)) 
 
 with app.app_context():
     db.create_all()  
+    if not User.query.filter_by(username='admin').first():
+        hashed_pw = bcrypt.generate_password_hash('1234').decode('utf-8')
+        admin = User(username ='admin', password='hashed_pw', is_admin=True)
+        db.session.add(admin)
+        db.session.commit()
 
 #인증 API
 @app.route('/login', methods=['POST'])
