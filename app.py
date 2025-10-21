@@ -44,6 +44,14 @@ with app.app_context():
         db.session.add(admin)
         db.session.commit()
 
+#모든 응답에 UTF-8 헤더추가
+@app.after_request
+def after_request(response):
+    response.headers.add('Content-Type', 'text/html; charset=utf-8')
+    response.headers.add('Content-Type', 'application/json; charset=utf-8')
+    return response
+
+
 #인증 API
 @app.route('/login', methods=['POST'])
 def login():
@@ -54,7 +62,7 @@ def login():
     user = User.query.filter_by(username = username).first()
     if user and bcrypt.check_password_hash(user.password, password):
         access_token = create_access_token(identity=user.id)
-        return jsonify({"message": "로그인 성공", "acess_token": access_token, "is_admin": user.is_admin}),200
+        return jsonify({"message": "로그인 성공", "acess_token": access_token, "is_admin": user.is_admin}, ensure_ascii=False),200
     return jsonify({"message": "로그인 실패"}),401
 
 @app.route('/logout', methods=['POST'])
@@ -109,7 +117,7 @@ def get_posts():
             "posts": posts_list,
             "total_pages": posts.pages,
             "current_pages": posts_page
-        }),200
+        }, ensure_ascii=False),200
 
 @app.route('/posts/<int:id>', methods=['PUT'])
 @jwt_required()
